@@ -1,0 +1,60 @@
+{
+    "name": "sql-evaluator",
+    "version": "0.0.0",
+    "private": true,
+    "scripts": {
+        "start": "npm run prod",
+        "build": "npm-run-all clean transpile",
+        "server": "node ./dist-server/bin/www.js",
+        "dev": "NODE_ENV=development npm-run-all build server",
+        "prod": "NODE_ENV=production npm-run-all build server",
+        "transpile": "babel ./dev-server --out-dir dist-server",
+        "clean": "rimraf dist-server",
+        "watch:dev": "nodemon"
+    },
+    "babel": {
+        "presets": [
+            "@babel/preset-env"
+        ]
+    },
+    "nodemonConfig": {
+        "exec": "npm run dev",
+        "watch": [
+            "dev-server/*"
+        ],
+        "ignore": [
+            "**/__tests__/**",
+            "*.test.js",
+            "*.spec.js",
+            "public/zip/*"
+        ]
+    },
+    "dependencies": {
+        "@babel/cli": "^7.15.7",
+        "@babel/core": "^7.15.8",
+        "@babel/preset-env": "^7.15.8",
+        "babel-polyfill": "^6.26.0",
+        "consolidate": "^0.16.0",
+        "cookie-parser": "~1.4.4",
+        "debug": "~2.6.9",
+        "dotenv": "^16.0.0",
+        "evaluation-report-juezlti": "^1.0.6-d",
+        "express": "~4.16.1",
+        "got": "^11.8.2",
+        "http-errors": "~1.6.3",
+        "jade": "~1.11.0",
+        "morgan": "~1.9.1",
+        "nodemon": "^2.0.14",
+        "npm-run-all": "^4.1.5",
+        "pg": "^8.7.3",
+        "programming-exercise-juezlti": "^1.0.8",
+        "pug": "^3.0.2",
+        "request": "^2.88.2",
+        "rimraf": "^3.0.2",
+        "swig": "^1.4.2",
+        "temp": "^0.9.4",
+        "url": "^0.11.0",
+        "xmldom": "^0.6.0",
+        "xpath": "0.0.32"
+    }
+}
