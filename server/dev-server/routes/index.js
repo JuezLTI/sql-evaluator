@@ -3,7 +3,7 @@ import { loadSchemaYAPEXIL, ProgrammingExercise } from "programming-exercise-jue
 import { loadSchemaPEARL, EvaluationReport } from "evaluation-report-juezlti";
 import dotenv from 'dotenv'
 dotenv.config('../env.js');
-import evaluator from "../evaluator";
+import evaluatorPostgreSQL from "../evaluatorPostgreSQL";
 import path from "path";
 import request from "request";
 
@@ -145,7 +145,7 @@ router.post("/eval", function(req, res, next) {
 });
 
 function evaluate(programmingExercise, evalReq, req, res, next) {
-    evaluator.evalSQL(programmingExercise, evalReq).then((obj) => {
+    evaluatorPostgreSQL.evalSQLPostgreSQL(programmingExercise, evalReq).then((obj) => {
        console.log("Answer ->" + JSON.stringify(obj))
        obj.reply.report.user_id = evalReq.studentID
        // TODO change number_of_tests to tests as PERL Schema
