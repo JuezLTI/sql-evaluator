@@ -2,6 +2,7 @@ import { loadSchemaPEARL, EvaluationReport } from "evaluation-report-juezlti"
 import "babel-polyfill"
 import { env } from "process"
 import { resolve } from "path"
+import convertOutput from "./convertOutput";
 const { Pool, Client } = require('pg')
 
 const LANGUAGE = 'pgsql'
@@ -47,7 +48,7 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
 
                     let input = programmingExercise.tests_contents_in[metadata.id]
 
-                    let expectedOutput = JSON.parse(programmingExercise.tests_contents_out[metadata.id])
+                    let expectedOutput = programmingExercise.tests_contents_out[metadata.id]
 
                     /* var expectedOutput = await getQueryResult(
                         solution
@@ -262,17 +263,13 @@ const endTransaction = (connection) => {
 }
 
 const addTest = (input, expectedOutput, obtainedOutput, lastTestError) => {
-    const Diff = require('diff')
+    expectedOutput = convertOutput.table2json(expectedOutput)
     obtainedOutput = obtainedOutput ? obtainedOutput : ''
-    function comparator(expectedRow, obtainedRow) {
-        return Diff.diffJson(expectedRow, obtainedRow)
-    }
-    const outputDifferences = Diff.diffArrays(expectedOutput, obtainedOutput, {comparator: comparator})
     return {
         'input': input,
-        'expectedOutput': JSON.stringify(expectedOutput),
-        'obtainedOutput': JSON.stringify(obtainedOutput),
-        'outputDifferences': outputDifferences ? outputDifferences : '',
+        'expectedOutput': convertOutput.json2table(expectedOutput),
+        'obtainedOutput': convertOutput.json2table(obtainedOutput),
+        'outputDifferences': getOutputDifferences(expectedOutput, obtainedOutput),
         'classify': getClassify(expectedOutput, obtainedOutput, lastTestError),
         'mark': getGrade(expectedOutput, obtainedOutput),
         'feedback': getFeedback(expectedOutput, obtainedOutput),
@@ -282,6 +279,17 @@ const addTest = (input, expectedOutput, obtainedOutput, lastTestError) => {
 
 const getGrade = (expectedOutput, obtainedOutput) => {
     return JSON.stringify(expectedOutput) == JSON.stringify(obtainedOutput) ? 100 : 0
+}
+
+const getOutputDifferences = (expectedOutput, obtainedOutput) => {
+    const Diff = require('diff')
+    // if expectedOutput come as a HTML table
+    function comparator(expectedRow, obtainedRow) {
+        return JSON.stringify(expectedRow) == JSON.stringify(obtainedRow)
+    }
+    const outputDifferences = Diff.diffArrays(expectedOutput, obtainedOutput, {comparator: comparator})
+
+    return outputDifferences;
 }
 
 const getFeedback = (expectedOutput, obtainedOutput) => {
