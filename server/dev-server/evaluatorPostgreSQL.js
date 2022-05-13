@@ -1,14 +1,16 @@
 import { loadSchemaPEARL, EvaluationReport } from "evaluation-report-juezlti"
 import "babel-polyfill"
 import { env } from "process"
+import { resolve } from "path"
 const { Pool, Client } = require('pg')
 
+const LANGUAGE = 'pgsql'
 var nameAndPassword = ''
-var globalProrammingExercise = {}
+var globalProgrammingExercise = {}
 
 async function evalSQLPostgreSQL(programmingExercise, evalReq) {
     return new Promise((resolve) => {
-        globalProrammingExercise = programmingExercise
+        globalProgrammingExercise = programmingExercise
         loadSchemaPEARL().then(async () => {
             let evalRes = new EvaluationReport()
             evalRes.setRequest(evalReq.request)
@@ -28,38 +30,42 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
                     "value": "https://www.postgresql.org/"
                 }]
             }
+            response.report.programmingLanguage = LANGUAGE
             response.report.exercise = programmingExercise.id
-            response.report.compilationErrors = []
+            let tests = []
             try {
-
                 let solution_id = ""
                 for (let solutions of programmingExercise.solutions) {
-                    if (solutions.lang == "sql") {
+                    if (solutions.lang == LANGUAGE) {
                         solution_id = solutions.id
                         break
                     }
                 }
                 const solution = programmingExercise.solutions_contents[solution_id]
-                let correct_anwsers = true
                 for (let metadata of programmingExercise.tests) {
+                    let lastTestError = {}
+
                     let input = programmingExercise.tests_contents_in[metadata.id]
 
-                    var teacherResult = getQueryResult(
+                    let expectedOutput = JSON.parse(programmingExercise.tests_contents_out[metadata.id])
+
+                    /* var expectedOutput = await getQueryResult(
                         solution
-                    )
-                    var studentResult = getQueryResult(
+                    ) */
+                    var resultStudent = await getQueryResult(
                         program
                     )
-                    if (teacherResult != studentResult) {
-                        correct_anwsers = false
-                        response.report.compilationErrors.push("incorrect sql solution")
-                    }
+                    .catch(error => {
+                        lastTestError = error
+                    })
+                    console.log(resultStudent.rows)
+                    tests.push(addTest(input, expectedOutput, resultStudent.rows, lastTestError))
                 }
-                evalRes.setReply(response)
-                resolve(evalRes)
 
             } catch (error) {
-                response.report.compilationErrors.push(error)
+                console.log(error)
+            } finally {
+                response.report.tests = tests
                 evalRes.setReply(response)
                 resolve(evalRes)
             }
@@ -68,139 +74,243 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
 }
 
 const getConnection = (dbUser = null, dbPassword = null, dbName = null) => {
-    let dbms = getQuestionDbms()
+//    let dbms = getQuestionDbms()
+    return new Promise((resolve, reject) => {
+        dbUser = dbUser ? dbUser : process.env.SQL_EVALUATOR_USER
+        dbPassword = dbPassword ? dbPassword : process.env.SQL_EVALUATOR_PASSWORD
+        dbName = dbName ? dbName : process.env.SQL_EVALUATOR_DATABASE
 
-    dbUser = dbUser ? dbUser : env('SQL_EVALUATOR_USER')
-    dbPassword = dbPassword ? dbPassword : env('SQL_EVALUATOR_PASSWORD')
-    dbName = dbName ? dbName : env('SQL_EVALUATOR_DATABASE')
-    let connectionParameters = {
-        user: dbUser,
-        host: env('SQL_EVALUATOR_HOST'),
-        database: dbName,
-        password: dbPassword,
-        port: env('SQL_EVALUATOR_PORT'),
-      }
-      console.log(connectionParameters)
-    const connection = new Pool(connectionParameters)
+        let connectionParameters = {
+            user: dbUser.toLowerCase(),
+            host: process.env.SQL_EVALUATOR_HOST,
+            database: dbName.toLowerCase(),
+            password: dbPassword,
+            port: process.env.SQL_EVALUATOR_PORT,
+        }
 
-    return connection
+        const pool = new Pool(connectionParameters)
+
+        pool.connect()
+        .then(connectionPostgreSQL => {
+            resolve(connectionPostgreSQL)
+        })
+        .catch(error => {
+            console.log(error)
+            reject(error)
+        })
+    })
 }
 
 // TODO code preGrade with MUST and MUSN'T
 
 const getQueryResult = (queries = null)  => {
-    connection = initTransaction()
-    connection.query('queries', (err, res) => {
-        console.log(err, res)
-        connection.end()
-      })
-    // TODO execute solution's queries
-/*     if(isRoutine(queries)) {
-        query = substr(rtrim(queries), 0, strlen(rtrim(queries)) - 1)
-        query = str_replace("'", "''", query)
-        if (resultQuery = connection.prepare(query)) {
-            resultQuery.execute()
-        }
-    } else {
-        explode(";", queries).foreach(query => {
-            if(isQuery(query) && (resultQuery = connection.prepare(query))) {
-                resultQuery.execute()
-            }
-        })
-    } */
-
-    if (getQuestionType() == 'DML' || getQuestionType() == 'DDL') {
-        explode(";", getQuestionProbe()).foreach(query => {
-            if(isQuery(query) && (resultQuery = connection.prepare(query))) {
-                resultQuery.execute()
-                if(connection.errorInfo()[1] > 0 ) { 
-                    queryProbe =
-                        " BEGIN " + query + "; END;"
-                    if (resultQuery = connection.prepare(queryProbe)) {
+return new Promise((resolve, reject) => {
+    initTransaction()
+    .then((connection) => {
+        connection.query(queries, (err, resultQuery) => {
+            if(err) reject(err)
+            // TODO execute solution's queries DML and DDL
+        /*     if(isRoutine(queries)) {
+                query = substr(rtrim(queries), 0, strlen(rtrim(queries)) - 1)
+                query = str_replace("'", "''", query)
+                if (resultQuery = connection.prepare(query)) {
+                    resultQuery.execute()
+                }
+            } else {
+                explode(";", queries).foreach(query => {
+                    if(isQuery(query) && (resultQuery = connection.prepare(query))) {
                         resultQuery.execute()
                     }
+                })
+            } */
 
-                }
+    /*         if (getQuestionType() == 'DML' || getQuestionType() == 'DDL') {
+                explode(";", getQuestionProbe()).foreach(query => {
+                    if(isQuery(query) && (resultQuery = connection.prepare(query))) {
+                        resultQuery.execute()
+                        if(connection.errorInfo()[1] > 0 ) { 
+                            queryProbe =
+                                " BEGIN " + query + "; END;"
+                            if (resultQuery = connection.prepare(queryProbe)) {
+                                resultQuery.execute()
+                            }
+
+                        }
+                    }
+                })
+                // We only watch the result of the last query. The last query will often be a SELECT query
             }
+            */
+            // resultQueryArray = resultQuery ? resultQuery.fetchAll() : array()
+            // resultQuery = null
+            endTransaction(connection)
+            .then(connection => {
+                connection.end()
+                resolve(resultQuery)
+            })
+            .catch(error => {
+                reject(error)
+            })
         })
-        // We only watch the result of the last query. The last query will often be a SELECT query
-    }
-    resultQueryArray = resultQuery ? resultQuery.fetchAll() : array()
-    resultQuery = null
-    endTransaction(connection)
-    return resultQueryArray
-}
+    })
+    .catch(error => {
+        console.log(error)
+    })
 
-const isRoutine = (query)  => {
-    // TODO define when a query is a routine
-    return false
-}
-
-const isQuery = (query)  => {
-    return strlen(trim(query)) > 1
+})
 }
 
 const createOnflySchema = (connection)  => {
-    let dbms = getQuestionDbms()
-    nameAndPassword = env('SQL_EVALUATOR_USERPREFIX') + getNameAndPasswordSuffix()
+    return new Promise((resolve, reject) => {
+        //    let dbms = getQuestionDbms()
+        nameAndPassword = process.env.SQL_EVALUATOR_USERPREFIX + getNameAndPasswordSuffix()
 
-    createUserSentence =
-        "CALL " + env('CREATEISOLATEUSERPROCEDURE') + "('"
-        + nameAndPassword + "', '"
-        + nameAndPassword
-        + "')"
-    if (resultQuery = connection.prepare(createUserSentence)) {
-        resultQuery.execute()
-    }
-    databaseName = nameAndPassword
-    connection = getConnection(nameAndPassword, nameAndPassword, databaseName)
+        const createUserSentence =
+            "CALL " + process.env.CREATEISOLATEUSERPROCEDURE + "('"
+            + nameAndPassword + "', '"
+            + nameAndPassword
+            + "')"
+        connection
+        .query(createUserSentence)
+        .then(res => {
+            connection.end()
+            let databaseName = nameAndPassword
+            getConnection(nameAndPassword, nameAndPassword, databaseName)
+            .then(connection => {
+                let onFlyPromises = []
+                for(let library of globalProgrammingExercise.libraries) {
+                    let onFlyQuery = globalProgrammingExercise.libraries_contents[library.id]
+                    onFlyPromises.push(connection.query(onFlyQuery))
+                }
+                Promise.all(onFlyPromises)
+                .then(onFlyResults => {
+                    resolve(connection)
+                })
+                .catch(error => {
+                    reject(error)
+                })
+            })
 
-    connection.exec(this.getQuestionOnfly())
-    return connection
+        })
+        .catch(e => reject(e))
+    })
 }
 
 const dropOnflySchema = (connection) => {
-    let dbms = getQuestionDbms()
-    nameAndPassword = env('SQL_EVALUATOR_USERPREFIX') + getNameAndPasswordSuffix()
-    dropUserSentence =
-        "CALL " + onFly['dropIsolateUserProcedure'] + "('"
-        + nameAndPassword
-        + "')"
-
-    if(resultQuery = connection.prepare(dropUserSentence)) {
-        resultQuery.execute()
-    }
+    return new Promise((resolve, reject) => {
+        // let dbms = getQuestionDbms()
+        let dropUserSentence =
+            "CALL " + process.env.DROPISOLATEUSERPROCEDURE + "('"
+            + nameAndPassword
+            + "')"
+            connection
+            .query(dropUserSentence)
+            .then(res => {
+                resolve(res)
+            })
+            .catch(e => reject(e))
+    })
 }
 
 const getNameAndPasswordSuffix = () => {
-    if(nameAndPassword == '') {
-        const crypto = require('crypto');
-        const buf = crypto.randomBytes(16);
-        nameAndPassword = buf.toString('utf8');
-    }
-    return nameAndPassword
+    const crypto = require('crypto')
+    return crypto.randomUUID().replace(/-/g, "")
 }
 
 const initTransaction = () => {
-    connection = getConnection()
-    connection = createOnflySchema(connection)
-    connection.beginTransaction()
-    return connection
+    return new Promise((resolve, reject) => {
+        getConnection()
+            .then(connection => {
+                createOnflySchema(connection)
+                .then(connection => {
+                    connection.query('BEGIN', error => {
+                        if(error) reject(error)
+                        resolve(connection)
+                    })
+                })
+                .catch(error => {
+                    console.log(error)
+                    reject(error)
+                })
+            })
+            .catch(error => {
+                console.log(error)
+                reject(error)
+            })
+    })
 }
 
 const endTransaction = (connection) => {
-    connection.rollback()
-    // Close statement & connection to drop user
-    connection = null
-    connection = getConnection()
-    connection = dropOnflySchema(connection)
-    return connection
+    return new Promise((resolve, reject) => {
+        connection.query('ROLLBACK', error => {
+            if(error) reject(error)
+            // Close statement & connection to drop user
+            connection.end()
+            getConnection()
+            .then(connection => {
+                dropOnflySchema(connection)
+                .then(res => {resolve(connection)})
+                .catch(error => {
+                    reject(error)
+                })
+            })
+            .catch(error => {
+                reject(error)
+            })
+        })
+    })
 }
 
-const sanitize = (stmt) => {
-    sanitizedStmt = str_replace("'", "''", trim(stmt))
-    return sanitizedStmt
+const addTest = (input, expectedOutput, obtainedOutput, lastTestError) => {
+    const Diff = require('diff')
+    obtainedOutput = obtainedOutput ? obtainedOutput : ''
+    function comparator(expectedRow, obtainedRow) {
+        return Diff.diffJson(expectedRow, obtainedRow)
+    }
+    const outputDifferences = Diff.diffArrays(expectedOutput, obtainedOutput, {comparator: comparator})
+    return {
+        'input': input,
+        'expectedOutput': JSON.stringify(expectedOutput),
+        'obtainedOutput': JSON.stringify(obtainedOutput),
+        'outputDifferences': outputDifferences ? outputDifferences : '',
+        'classify': getClassify(expectedOutput, obtainedOutput, lastTestError),
+        'mark': getGrade(expectedOutput, obtainedOutput),
+        'feedback': getFeedback(expectedOutput, obtainedOutput),
+        'environmentValues': []
+    }
 }
+
+const getGrade = (expectedOutput, obtainedOutput) => {
+    return JSON.stringify(expectedOutput) == JSON.stringify(obtainedOutput) ? 100 : 0
+}
+
+const getFeedback = (expectedOutput, obtainedOutput) => {
+    let feedback = 'Right Answer.'
+    // TODO get feedback from exercise's test
+
+    if(getGrade(expectedOutput, obtainedOutput) < 1)
+        feedback = 'Wrong Answer.'
+
+    return feedback
+}
+
+const getClassify = (expectedOutput, obtainedOutput, lastTestError) => {
+    let classify = 'Accepted'
+console.log('lastTestError: ' + JSON.stringify(lastTestError))
+    if(getGrade(expectedOutput, obtainedOutput) < 1)
+        classify = 'Wrong Answer'
+    if(lastTestError?.code) {
+        switch(lastTestError.code) {
+            case 143:
+                classify = 'Time Limit Exceeded'
+                break
+            default:
+                classify = 'Runtime Error'
+        }
+    }
+    return classify
+}
+
 
 const getQueryTable = () => {
     resultQueryString = ''

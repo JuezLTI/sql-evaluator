@@ -86,7 +86,6 @@ router.get("/", function(req, res) {
 router.post("/eval", function(req, res, next) {
 
     loadSchemaPEARL().then(() => {
-        console.log(req.body)
 
         let evalReq = new EvaluationReport();
         if (evalReq.setRequest(req.body)) {
@@ -134,7 +133,7 @@ router.post("/eval", function(req, res, next) {
                     }
                 } catch (error) {
                     console.log(" Exception:  " + error);
-                    res.send({ error: error });
+                    res.send({ "error": "INVALID YAPExIL" }).status(500);
                 }
             }
         } else {
