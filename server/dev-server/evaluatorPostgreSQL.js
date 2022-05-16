@@ -6,6 +6,8 @@ import convertOutput from "./convertOutput";
 const { Pool, Client } = require('pg')
 
 const LANGUAGE = 'pgsql'
+const DML = 'SQL-DML'
+const DDL = 'SQL-DDL'
 var nameAndPassword = ''
 var globalProgrammingExercise = {}
 
@@ -59,8 +61,8 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
                     .catch(error => {
                         lastTestError = error
                     })
-                    console.log(resultStudent.rows)
-                    tests.push(addTest(input, expectedOutput, resultStudent.rows, lastTestError))
+                    let studentRows = resultStudent ? resultStudent.rows : []
+                    tests.push(addTest(input, expectedOutput, studentRows, lastTestError))
                 }
 
             } catch (error) {
@@ -75,7 +77,7 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
 }
 
 const getConnection = (dbUser = null, dbPassword = null, dbName = null) => {
-//    let dbms = getQuestionDbms()
+    //    let dbms = getQuestionDbms()
     return new Promise((resolve, reject) => {
         dbUser = dbUser ? dbUser : process.env.SQL_EVALUATOR_USER
         dbPassword = dbPassword ? dbPassword : process.env.SQL_EVALUATOR_PASSWORD
@@ -92,25 +94,53 @@ const getConnection = (dbUser = null, dbPassword = null, dbName = null) => {
         const pool = new Pool(connectionParameters)
 
         pool.connect()
-        .then(connectionPostgreSQL => {
-            resolve(connectionPostgreSQL)
-        })
-        .catch(error => {
-            console.log(error)
-            reject(error)
-        })
+            .then(connectionPostgreSQL => {
+                resolve(connectionPostgreSQL)
+            })
+            .catch(error => {
+                console.log(error)
+                reject(error)
+            })
     })
 }
 
 // TODO code preGrade with MUST and MUSN'T
 
-const getQueryResult = (queries = null)  => {
-return new Promise((resolve, reject) => {
-    initTransaction()
-    .then((connection) => {
-        connection.query(queries, (err, resultQuery) => {
-            if(err) reject(err)
-            // TODO execute solution's queries DML and DDL
+const getQueryResult = (queries = null) => {
+    return new Promise((resolve, reject) => {
+        initTransaction()
+            .then((connection) => {
+                connection.query(queries, (err, resultQuery) => {
+                    if (err) reject(err)
+                    let questionType = getQuestionType()
+                    if (questionType.includes(DML) || questionType.includes(DDL)) {
+                        connection.query(getQuestionProbe(), (err, resultQuery) => {
+                            if (err) reject(err)
+                            endTransaction(connection)
+                                .then(connection => {
+                                    connection.end()
+                                    resolve(resultQuery)
+                                })
+                                .catch(error => {
+                                    reject(error)
+                                })
+                        })
+                    } else {
+                        endTransaction(connection)
+                        .then(connection => {
+                            connection.end()
+                            resolve(resultQuery)
+                        })
+                        .catch(error => {
+                            reject(error)
+                        })
+                    }
+                })
+            })
+            .catch(error => {
+                console.log(error)
+            })
+        // TODO execute solution's queries DML and DDL
         /*     if(isRoutine(queries)) {
                 query = substr(rtrim(queries), 0, strlen(rtrim(queries)) - 1)
                 query = str_replace("'", "''", query)
@@ -123,9 +153,8 @@ return new Promise((resolve, reject) => {
                         resultQuery.execute()
                     }
                 })
-            } */
-
-    /*         if (getQuestionType() == 'DML' || getQuestionType() == 'DDL') {
+            }
+            if (getQuestionType() == 'DML' || getQuestionType() == 'DDL') {
                 explode(";", getQuestionProbe()).foreach(query => {
                     if(isQuery(query) && (resultQuery = connection.prepare(query))) {
                         resultQuery.execute()
@@ -142,26 +171,13 @@ return new Promise((resolve, reject) => {
                 // We only watch the result of the last query. The last query will often be a SELECT query
             }
             */
-            // resultQueryArray = resultQuery ? resultQuery.fetchAll() : array()
-            // resultQuery = null
-            endTransaction(connection)
-            .then(connection => {
-                connection.end()
-                resolve(resultQuery)
-            })
-            .catch(error => {
-                reject(error)
-            })
-        })
-    })
-    .catch(error => {
-        console.log(error)
-    })
+        // resultQueryArray = resultQuery ? resultQuery.fetchAll() : array()
+        // resultQuery = null
 
-})
+    })
 }
 
-const createOnflySchema = (connection)  => {
+const createOnflySchema = (connection) => {
     return new Promise((resolve, reject) => {
         //    let dbms = getQuestionDbms()
         nameAndPassword = process.env.SQL_EVALUATOR_USERPREFIX + getNameAndPasswordSuffix()
@@ -172,28 +188,28 @@ const createOnflySchema = (connection)  => {
             + nameAndPassword
             + "')"
         connection
-        .query(createUserSentence)
-        .then(res => {
-            connection.end()
-            let databaseName = nameAndPassword
-            getConnection(nameAndPassword, nameAndPassword, databaseName)
-            .then(connection => {
-                let onFlyPromises = []
-                for(let library of globalProgrammingExercise.libraries) {
-                    let onFlyQuery = globalProgrammingExercise.libraries_contents[library.id]
-                    onFlyPromises.push(connection.query(onFlyQuery))
-                }
-                Promise.all(onFlyPromises)
-                .then(onFlyResults => {
-                    resolve(connection)
-                })
-                .catch(error => {
-                    reject(error)
-                })
-            })
+            .query(createUserSentence)
+            .then(res => {
+                connection.end()
+                let databaseName = nameAndPassword
+                getConnection(nameAndPassword, nameAndPassword, databaseName)
+                    .then(connection => {
+                        let onFlyPromises = []
+                        for (let library of globalProgrammingExercise.libraries) {
+                            let onFlyQuery = globalProgrammingExercise.libraries_contents[library.id]
+                            onFlyPromises.push(connection.query(onFlyQuery))
+                        }
+                        Promise.all(onFlyPromises)
+                            .then(onFlyResults => {
+                                resolve(connection)
+                            })
+                            .catch(error => {
+                                reject(error)
+                            })
+                    })
 
-        })
-        .catch(e => reject(e))
+            })
+            .catch(e => reject(e))
     })
 }
 
@@ -204,7 +220,7 @@ const dropOnflySchema = (connection) => {
             "CALL " + process.env.DROPISOLATEUSERPROCEDURE + "('"
             + nameAndPassword
             + "')"
-            connection
+        connection
             .query(dropUserSentence)
             .then(res => {
                 resolve(res)
@@ -223,16 +239,16 @@ const initTransaction = () => {
         getConnection()
             .then(connection => {
                 createOnflySchema(connection)
-                .then(connection => {
-                    connection.query('BEGIN', error => {
-                        if(error) reject(error)
-                        resolve(connection)
+                    .then(connection => {
+                        connection.query('BEGIN', error => {
+                            if (error) reject(error)
+                            resolve(connection)
+                        })
                     })
-                })
-                .catch(error => {
-                    console.log(error)
-                    reject(error)
-                })
+                    .catch(error => {
+                        console.log(error)
+                        reject(error)
+                    })
             })
             .catch(error => {
                 console.log(error)
@@ -244,20 +260,20 @@ const initTransaction = () => {
 const endTransaction = (connection) => {
     return new Promise((resolve, reject) => {
         connection.query('ROLLBACK', error => {
-            if(error) reject(error)
+            if (error) reject(error)
             // Close statement & connection to drop user
             connection.end()
             getConnection()
-            .then(connection => {
-                dropOnflySchema(connection)
-                .then(res => {resolve(connection)})
+                .then(connection => {
+                    dropOnflySchema(connection)
+                        .then(res => { resolve(connection) })
+                        .catch(error => {
+                            reject(error)
+                        })
+                })
                 .catch(error => {
                     reject(error)
                 })
-            })
-            .catch(error => {
-                reject(error)
-            })
         })
     })
 }
@@ -287,7 +303,7 @@ const getOutputDifferences = (expectedOutput, obtainedOutput) => {
     function comparator(expectedRow, obtainedRow) {
         return JSON.stringify(expectedRow) == JSON.stringify(obtainedRow)
     }
-    const outputDifferences = Diff.diffArrays(expectedOutput, obtainedOutput, {comparator: comparator})
+    const outputDifferences = Diff.diffArrays(expectedOutput, obtainedOutput, { comparator: comparator })
 
     return outputDifferences;
 }
@@ -296,7 +312,7 @@ const getFeedback = (expectedOutput, obtainedOutput) => {
     let feedback = 'Right Answer.'
     // TODO get feedback from exercise's test
 
-    if(getGrade(expectedOutput, obtainedOutput) < 1)
+    if (getGrade(expectedOutput, obtainedOutput) < 1)
         feedback = 'Wrong Answer.'
 
     return feedback
@@ -304,11 +320,11 @@ const getFeedback = (expectedOutput, obtainedOutput) => {
 
 const getClassify = (expectedOutput, obtainedOutput, lastTestError) => {
     let classify = 'Accepted'
-console.log('lastTestError: ' + JSON.stringify(lastTestError))
-    if(getGrade(expectedOutput, obtainedOutput) < 1)
+    console.log('lastTestError: ' + JSON.stringify(lastTestError))
+    if (getGrade(expectedOutput, obtainedOutput) < 1)
         classify = 'Wrong Answer'
-    if(lastTestError?.code) {
-        switch(lastTestError.code) {
+    if (lastTestError?.code) {
+        switch (lastTestError.code) {
             case 143:
                 classify = 'Time Limit Exceeded'
                 break
@@ -319,53 +335,14 @@ console.log('lastTestError: ' + JSON.stringify(lastTestError))
     return classify
 }
 
-
-const getQueryTable = () => {
-    resultQueryString = ''
-    if (getQuestionType() == 'SELECT') {
-        let connection = initTransaction()
-        resultQueryString = "<div class='table-results'><table>"
-        query = getQuestionSolution()
-        if(resultQuery = connection.prepare(query)) {
-            resultQuery.execute()
-            resultQueryString += getQueryTableContent(resultQuery)
-            resultQueryString += "</table></div>"
-        }
-        resultQuery = null
-        connection = endTransaction(connection)
-    }
-    return resultQueryString
+const getQuestionType = () => {
+    return globalProgrammingExercise.programmingLanguages
 }
 
-const getQueryTableContent = (resultQuery) => {
-    resultQueryString = ''
-    if (is_array(firstRow = resultQuery.fetch())) { // \PDO::FETCH_ASSOC
-        resultQueryString += getHeaderQueryTable(firstRow)
-        resultQueryString += getBodyQueryTable(firstRow, resultQuery)
-    }
-    return resultQueryString
-}
-
-const getHeaderQueryTable = (firstRow) => {
-    columnNames = array_keys(firstRow)
-    return getQueryTableRow(columnNames, true)
-}
-
-const getBodyQueryTable = (firstRow, resultQuery) => {
-    tableBody = getQueryTableRow(array_values(firstRow), false)
-    while (row = resultQuery.fetch()) { // \PDO::FETCH_NUM
-        tableBody += getQueryTableRow(row, false)
-    }
-    return tableBody
-}
-
-const getQueryTableRow = (row, header = false) => {
-    tableRow = "<tr>"
-    row.foreach (value => {
-        tableRow += ( header ? "<th>" : "<td>") + value + ( header ? "</th>" : "</td>")
-    })
-    tableRow += "</tr>"
-    return tableRow
+const getQuestionProbe = () => {
+    let metadata = globalProgrammingExercise.tests
+    let queriesProbe = globalProgrammingExercise.tests_contents_in[metadata[0].id]
+    return queriesProbe
 }
 
 module.exports = {
