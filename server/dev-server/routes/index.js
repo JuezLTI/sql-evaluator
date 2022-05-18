@@ -172,7 +172,7 @@ router.post("/eval", function(req, res, next) {
                 Accept: "application/json",
                 "Content-Type": "application/json",
             },
-            body: { PEARL: req.sql_eval_result }
+            body: JSON.stringify({ PEARL: req.sql_eval_result })
         },
         function(error, response) {
 

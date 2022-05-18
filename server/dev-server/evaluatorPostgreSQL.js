@@ -50,19 +50,20 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
 
                     let input = programmingExercise.tests_contents_in[metadata.id]
 
-                    let expectedOutput = programmingExercise.tests_contents_out[metadata.id]
+                    // let expectedOutput = programmingExercise.tests_contents_out[metadata.id]
 
-                    /* var expectedOutput = await getQueryResult(
+                    let expectedOutput = await getQueryResult(
                         solution
-                    ) */
-                    var resultStudent = await getQueryResult(
+                    )
+                    let resultStudent = await getQueryResult(
                         program
                     )
                     .catch(error => {
                         lastTestError = error
                     })
-                    let studentRows = resultStudent ? resultStudent.rows : []
-                    tests.push(addTest(input, expectedOutput, studentRows, lastTestError))
+                    let expectedRows = getRowsFromResult(expectedOutput)
+                    let studentRows = getRowsFromResult(resultStudent)
+                    tests.push(addTest(input, expectedRows, studentRows, lastTestError))
                 }
 
             } catch (error) {
@@ -74,6 +75,16 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
             }
         })
     })
+}
+
+const getRowsFromResult = (obtainedOutput) => {
+    let rows = []
+    if(Array.isArray(obtainedOutput)) {
+        rows = obtainedOutput[obtainedOutput.length - 1].rows
+    } else {
+        rows = obtainedOutput ? obtainedOutput.rows : []
+    }
+    return rows
 }
 
 const getConnection = (dbUser = null, dbPassword = null, dbName = null) => {
@@ -110,70 +121,30 @@ const getQueryResult = (queries = null) => {
     return new Promise((resolve, reject) => {
         initTransaction()
             .then((connection) => {
-                connection.query(queries, (err, resultQuery) => {
-                    if (err) reject(err)
-                    let questionType = getQuestionType()
-                    if (questionType.includes(DML) || questionType.includes(DDL)) {
-                        connection.query(getQuestionProbe(), (err, resultQuery) => {
-                            if (err) reject(err)
-                            endTransaction(connection)
-                                .then(connection => {
-                                    connection.end()
-                                    resolve(resultQuery)
-                                })
-                                .catch(error => {
-                                    reject(error)
-                                })
-                        })
-                    } else {
-                        endTransaction(connection)
-                        .then(connection => {
-                            connection.end()
-                            resolve(resultQuery)
-                        })
-                        .catch(error => {
-                            reject(error)
-                        })
-                    }
-                })
-            })
-            .catch(error => {
-                console.log(error)
-            })
-        // TODO execute solution's queries DML and DDL
-        /*     if(isRoutine(queries)) {
-                query = substr(rtrim(queries), 0, strlen(rtrim(queries)) - 1)
-                query = str_replace("'", "''", query)
-                if (resultQuery = connection.prepare(query)) {
-                    resultQuery.execute()
+                let questionType = getQuestionType()
+                if (questionType.includes(DML) || questionType.includes(DDL)) {
+                    queries += ';\n' + getQuestionProbe()
                 }
-            } else {
-                explode(";", queries).foreach(query => {
-                    if(isQuery(query) && (resultQuery = connection.prepare(query))) {
-                        resultQuery.execute()
-                    }
+                connection.query(queries)
+                .then((resultQuery) => {
+                    endTransaction(connection)
+                    .then(() => {
+                        resolve(resultQuery)
+                    })
+                    .catch(error => { // error in rollback
+                        console.log(error)
+                        reject(error)
+                    })
                 })
-            }
-            if (getQuestionType() == 'DML' || getQuestionType() == 'DDL') {
-                explode(";", getQuestionProbe()).foreach(query => {
-                    if(isQuery(query) && (resultQuery = connection.prepare(query))) {
-                        resultQuery.execute()
-                        if(connection.errorInfo()[1] > 0 ) { 
-                            queryProbe =
-                                " BEGIN " + query + "; END;"
-                            if (resultQuery = connection.prepare(queryProbe)) {
-                                resultQuery.execute()
-                            }
-
-                        }
-                    }
+                .catch(error => { // wrong sql solution or test statements
+                    console.log(error)
+                    reject(error)
                 })
-                // We only watch the result of the last query. The last query will often be a SELECT query
-            }
-            */
-        // resultQueryArray = resultQuery ? resultQuery.fetchAll() : array()
-        // resultQuery = null
-
+            })
+            .catch(error => { // wrong onFly schema
+                console.log(error)
+                reject(error)
+            })
     })
 }
 
@@ -260,13 +231,16 @@ const initTransaction = () => {
 const endTransaction = (connection) => {
     return new Promise((resolve, reject) => {
         connection.query('ROLLBACK', error => {
-            if (error) reject(error)
             // Close statement & connection to drop user
             connection.end()
+            if (error) reject(error)
             getConnection()
                 .then(connection => {
                     dropOnflySchema(connection)
-                        .then(res => { resolve(connection) })
+                        .then(res => {
+                            connection.end
+                            resolve()
+                        })
                         .catch(error => {
                             reject(error)
                         })
@@ -279,7 +253,8 @@ const endTransaction = (connection) => {
 }
 
 const addTest = (input, expectedOutput, obtainedOutput, lastTestError) => {
-    expectedOutput = convertOutput.table2json(expectedOutput)
+    expectedOutput = expectedOutput ? expectedOutput : ''
+    // expectedOutput = convertOutput.table2json(expectedOutput)
     obtainedOutput = obtainedOutput ? obtainedOutput : ''
     return {
         'input': input,
