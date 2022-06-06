@@ -15,10 +15,15 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
     return new Promise((resolve) => {
         globalProgrammingExercise = programmingExercise
         loadSchemaPEARL().then(async () => {
-            let evalRes = new EvaluationReport()
+            var evalRes = new EvaluationReport(),
+                response = {},
+                summary = {
+                    "classify" : 'Accepted',
+                    "feedback" : 'Well done'
+                }
+
             evalRes.setRequest(evalReq.request)
             let program = evalReq.request.program
-            let response = {}
             response.report = {}
             response.report.capability = {
                 "id": "SQL-evaluator",
@@ -63,14 +68,26 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
                     })
                     let expectedRows = getRowsFromResult(expectedOutput)
                     let studentRows = getRowsFromResult(resultStudent)
+                    if(getGrade(expectedRows, studentRows) == 0) {
+                        summary = {
+                            "classify" : 'Wrong Answer',
+                            "feedback" : 'Try it again'
+                        }
+                    }
                     tests.push(addTest(input, expectedRows, studentRows, lastTestError))
                 }
 
             } catch (error) {
                 console.log(error)
+                let summary = {
+                    "classify" : "Compile Time Error",
+                    "feedback" : error.message
+                }
+                evalRes.summary = summary
             } finally {
                 response.report.tests = tests
                 evalRes.setReply(response)
+                evalRes.summary = summary
                 resolve(evalRes)
             }
         })

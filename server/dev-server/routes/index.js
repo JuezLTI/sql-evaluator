@@ -35,7 +35,7 @@ router.get("/capabilities", function(req, res, next) {
             id: "SQL-DML",
             features: [{
                     name: "language",
-                    value: "sql-dMl",
+                    value: "sql-dml",
                 },
                 {
                     name: "version",
@@ -133,7 +133,7 @@ router.post("/eval", function(req, res, next) {
                     }
                 } catch (error) {
                     console.log(" Exception:  " + error);
-                    res.send({ "error": "INVALID YAPExIL" }).status(500);
+                    res.send({ error: error }).status(500);
                 }
             }
         } else {
@@ -146,19 +146,7 @@ router.post("/eval", function(req, res, next) {
 function evaluate(programmingExercise, evalReq, req, res, next) {
     evaluatorPostgreSQL.evalSQLPostgreSQL(programmingExercise, evalReq).then((obj) => {
        console.log("Answer ->" + JSON.stringify(obj))
-       obj.reply.report.user_id = evalReq.studentID
-       // TODO change number_of_tests to tests as PERL Schema
-       // obj.reply.report.number_of_tests = programmingExercise.getTests().length
-       // let x = ([...Array(obj.reply.report.number_of_tests).keys()].filter((value) => { return !(value.toString() in obj.reply.report.compilationErrors) }))
-       // obj.reply.report.number_of_incorrect_tests = Object.keys(obj.reply.report.compilationErrors);
-       // obj.reply.report.number_of_correct_tests = x;
-        req.sql_eval_result = JSON.stringify(obj);
-        /*     if (obj.reply.report.compilationErrors.length > 0) {
-                res.send("Incorrect Answer\n").status(200);
-            } else {
-                res.send("Correct Answer\n").status(200);
-
-            }*/
+       req.sql_eval_result = obj;
 
         next();
     });
@@ -172,16 +160,17 @@ router.post("/eval", function(req, res, next) {
                 Accept: "application/json",
                 "Content-Type": "application/json",
             },
-            body: JSON.stringify({ PEARL: req.sql_eval_result })
+            body: JSON.stringify(req.sql_eval_result)
         },
         function(error, response) {
 
             if (error!=null){
                 console.log(error)
-                res.json(error);
+                res.json(error).status(500);
             }
             else {
-                res.json(response.body);
+                let pearlWithFeedback = JSON.parse(response.body)
+                res.json(pearlWithFeedback);
             } 
         }
     );
