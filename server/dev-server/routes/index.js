@@ -9,8 +9,6 @@ import request from "request";
 
 import fs from "fs";
 
-var data = [];
-
 var router = express.Router();
 
 router.get("/capabilities", function(req, res, next) {
@@ -90,51 +88,32 @@ router.post("/eval", function(req, res, next) {
         let evalReq = new EvaluationReport();
         if (evalReq.setRequest(req.body)) {
             if ("program" in evalReq.request) {
-                try {
-                    let exerciseObj = new ProgrammingExercise();
-                    if (data.includes(evalReq.request.learningObject)) {
-                        ProgrammingExercise.deserialize(path.join(__dirname, "../../public/zip"), `${evalReq.request.learningObject}.zip`).
-                        then((programmingExercise) => {
+                loadSchemaYAPEXIL().then(() => {
+                    ProgrammingExercise
+                        .loadRemoteExercise(evalReq.request.learningObject,{
+                            'BASE_URL':process.env.BASE_URL,
+                            'EMAIL':process.env.EMAIL,
+                            'PASSWORD':process.env.PASSWORD,
+                        })
+                        .then((programmingExercise) => {
+
                             evaluate(programmingExercise, evalReq, req, res, next)
-                        }).catch((error) => {
-                            console.log("error " + error);
-                            res.statusCode(500).send("The learning object request is already in cache but was not possible to read")
-                        })
-                    } else {
-                        loadSchemaYAPEXIL().then(() => {
-                            ProgrammingExercise
-                                .loadRemoteExercise(evalReq.request.learningObject,{
-                                    'BASE_URL':process.env.BASE_URL,
-                                    'EMAIL':process.env.EMAIL,
-                                    'PASSWORD':process.env.PASSWORD,
-                                })
-                                .then((programmingExercise) => {
 
-                                    evaluate(programmingExercise, evalReq, req, res, next)
-
-                                    data.push(programmingExercise.id);
-                                    programmingExercise
-                                        .serialize(path.join(__dirname, "../../public/zip"))
-                                        .then((test) => {
-                                            if (test) {
-                                                console.log(
-                                                    `The exercise ${programmingExercise.id} was insert in cache`
-                                                );
-                                            }
-                                        });
-                                }).catch((error) => {
-                                    console.log(error)
-                                    console.log(" 1º error LearningObj not found or could not be loaded");
-                                    res.send({ error: "LearningObj not found" });
+                            programmingExercise
+                                .serialize(path.join(__dirname, "../../public/zip"))
+                                .then((test) => {
+                                    if (test) {
+                                        console.log(
+                                            `The exercise ${programmingExercise.id} was insert in cache`
+                                        );
+                                    }
                                 });
-
-
-                        })
-                    }
-                } catch (error) {
-                    console.log(" Exception:  " + error);
-                    res.send({ error: error }).status(500);
-                }
+                        }).catch((error) => {
+                            console.log(error)
+                            console.log(" 1º error LearningObj not found or could not be loaded");
+                            res.send({ error: "LearningObj not found" });
+                        });
+                })
             }
         } else {
             res.send({ "error": "INVALID PEARL" }).status(500);
@@ -164,7 +143,7 @@ router.post("/eval", function(req, res, next) {
         },
         function(error, response) {
 
-            if (error!=null){
+            if (error!=null || response.statusCode != 200){
                 console.log(error)
                 res.json(error).status(500);
             }
@@ -176,4 +155,4 @@ router.post("/eval", function(req, res, next) {
     );
 });
 
-export { router, data };
+export { router };
