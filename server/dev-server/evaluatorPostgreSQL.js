@@ -44,7 +44,7 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
             try {
                 let solution_id = ""
                 for (let solutions of programmingExercise.solutions) {
-                    if (solutions.lang == LANGUAGE) {
+                    if (solutions.lang == LANGUAGE || solutions.lang == 'SQL') {
                         solution_id = solutions.id
                         break
                     }

@@ -88,32 +88,37 @@ router.post("/eval", function(req, res, next) {
         let evalReq = new EvaluationReport();
         if (evalReq.setRequest(req.body)) {
             if ("program" in evalReq.request) {
-                loadSchemaYAPEXIL().then(() => {
-                    ProgrammingExercise
-                        .loadRemoteExercise(evalReq.request.learningObject,{
-                            'BASE_URL':process.env.BASE_URL,
-                            'EMAIL':process.env.EMAIL,
-                            'PASSWORD':process.env.PASSWORD,
-                        })
-                        .then((programmingExercise) => {
+                ProgrammingExercise.deserialize(path.join(__dirname, "../../public/zip"), `${evalReq.request.learningObject}.zip`).
+                    then((programmingExercise) => {
+                        evaluate(programmingExercise, evalReq, req, res, next)
+                    }).catch((error) => {
+                        loadSchemaYAPEXIL().then(() => {
+                            ProgrammingExercise
+                                .loadRemoteExercise(evalReq.request.learningObject, {
+                                    'BASE_URL': process.env.BASE_URL,
+                                    'EMAIL': process.env.EMAIL,
+                                    'PASSWORD': process.env.PASSWORD,
+                                })
+                                .then((programmingExercise) => {
 
-                            evaluate(programmingExercise, evalReq, req, res, next)
+                                    evaluate(programmingExercise, evalReq, req, res, next)
 
-                            programmingExercise
-                                .serialize(path.join(__dirname, "../../public/zip"))
-                                .then((test) => {
-                                    if (test) {
-                                        console.log(
-                                            `The exercise ${programmingExercise.id} was insert in cache`
-                                        );
-                                    }
+                                    programmingExercise
+                                        .serialize(path.join(__dirname, "../../public/zip"))
+                                        .then((test) => {
+                                            if (test) {
+                                                console.log(
+                                                    `The exercise ${programmingExercise.id} was insert in cache`
+                                                );
+                                            }
+                                        });
+                                }).catch((error) => {
+                                    console.log(error)
+                                    console.log(" 1º error LearningObj not found or could not be loaded");
+                                    res.send({ error: "LearningObj not found" });
                                 });
-                        }).catch((error) => {
-                            console.log(error)
-                            console.log(" 1º error LearningObj not found or could not be loaded");
-                            res.send({ error: "LearningObj not found" });
-                        });
-                })
+                        })
+                    })
             }
         } else {
             res.send({ "error": "INVALID PEARL" }).status(500);
