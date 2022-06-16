@@ -5,7 +5,7 @@ import { resolve } from "path"
 import convertOutput from "./convertOutput";
 const { Pool, Client } = require('pg')
 
-const LANGUAGE = 'pgsql'
+const LANGUAGE = 'SQL'
 const DML = 'SQL-DML'
 const DDL = 'SQL-DDL'
 var nameAndPassword = ''
@@ -44,7 +44,7 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
             try {
                 let solution_id = ""
                 for (let solutions of programmingExercise.solutions) {
-                    if (solutions.lang == LANGUAGE || solutions.lang == 'SQL') {
+                    if (solutions.lang.toUpperCase().includes( LANGUAGE )) {
                         solution_id = solutions.id
                         break
                     }
@@ -328,7 +328,11 @@ const getClassify = (expectedOutput, obtainedOutput, lastTestError) => {
 }
 
 const getQuestionType = () => {
-    return globalProgrammingExercise.programmingLanguages
+    const questionTypes = globalProgrammingExercise.programmingLanguages.map(questionType => {
+        return questionType.toUpperCase()
+    })
+    return questionTypes;
+
 }
 
 const getQuestionProbe = () => {
