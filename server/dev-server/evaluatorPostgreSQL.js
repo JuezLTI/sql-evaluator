@@ -20,7 +20,8 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
                 summary = {
                     "classify" : 'Accepted',
                     "feedback" : 'Well done'
-                }
+                },
+                compilationError = false
 
             evalRes.setRequest(evalReq.request)
             let program = evalReq.request.program
@@ -51,7 +52,6 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
                 }
                 const solution = programmingExercise.solutions_contents[solution_id]
                 for (let metadata of programmingExercise.tests) {
-                    let lastTestError = {}
 
                     let input = programmingExercise.tests_contents_in[metadata.id]
 
@@ -64,26 +64,30 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
                         program
                     )
                     .catch(error => {
-                        lastTestError = error
-                    })
-                    let expectedRows = getRowsFromResult(expectedOutput)
-                    let studentRows = getRowsFromResult(resultStudent)
-                    if(getGrade(expectedRows, studentRows) == 0) {
                         summary = {
-                            "classify" : 'Wrong Answer',
-                            "feedback" : 'Try it again'
+                            "classify" : "Compile Time Error",
+                            "feedback" : error.message
                         }
+                        compilationError = true
+                    })
+                    if(!compilationError) {
+                        let expectedRows = getRowsFromResult(expectedOutput)
+                        let studentRows = getRowsFromResult(resultStudent)
+                        if(getGrade(expectedRows, studentRows) == 0) {
+                            summary = {
+                                "classify" : 'Wrong Answer',
+                                "feedback" : 'Try it again'
+                            }
+                        }
+                        tests.push(addTest(input, expectedRows, studentRows))
                     }
-                    tests.push(addTest(input, expectedRows, studentRows, lastTestError))
                 }
 
             } catch (error) {
-                console.log(error)
-                let summary = {
+                summary = {
                     "classify" : "Compile Time Error",
                     "feedback" : error.message
                 }
-                evalRes.summary = summary
             } finally {
                 response.report.tests = tests
                 evalRes.setReply(response)
@@ -269,7 +273,7 @@ const endTransaction = (connection) => {
     })
 }
 
-const addTest = (input, expectedOutput, obtainedOutput, lastTestError) => {
+const addTest = (input, expectedOutput, obtainedOutput) => {
     expectedOutput = expectedOutput ? expectedOutput : ''
     // expectedOutput = convertOutput.table2json(expectedOutput)
     obtainedOutput = obtainedOutput ? obtainedOutput : ''
@@ -278,7 +282,7 @@ const addTest = (input, expectedOutput, obtainedOutput, lastTestError) => {
         'expectedOutput': convertOutput.json2table(expectedOutput),
         'obtainedOutput': convertOutput.json2table(obtainedOutput),
         'outputDifferences': getOutputDifferences(expectedOutput, obtainedOutput),
-        'classify': getClassify(expectedOutput, obtainedOutput, lastTestError),
+        'classify': getClassify(expectedOutput, obtainedOutput),
         'mark': getGrade(expectedOutput, obtainedOutput),
         'feedback': getFeedback(expectedOutput, obtainedOutput),
         'environmentValues': []
@@ -310,20 +314,10 @@ const getFeedback = (expectedOutput, obtainedOutput) => {
     return feedback
 }
 
-const getClassify = (expectedOutput, obtainedOutput, lastTestError) => {
+const getClassify = (expectedOutput, obtainedOutput) => {
     let classify = 'Accepted'
-    console.log('lastTestError: ' + JSON.stringify(lastTestError))
     if (getGrade(expectedOutput, obtainedOutput) < 1)
         classify = 'Wrong Answer'
-    if (lastTestError?.code) {
-        switch (lastTestError.code) {
-            case 143:
-                classify = 'Time Limit Exceeded'
-                break
-            default:
-                classify = 'Runtime Error'
-        }
-    }
     return classify
 }
 
