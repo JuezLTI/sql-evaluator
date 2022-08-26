@@ -33,7 +33,7 @@ CREATE  PROCEDURE DROPISOLATEUSER
   DECLARE stmtDropUser VARCHAR(255);
   DECLARE stmtDropDatabase VARCHAR(255);
 BEGIN
-  IF LEFT(V_USERNAME, LENGTH(dbUserPrefix)) = dbUserPrefix THEN
+  IF LEFT(V_USERNAME, LENGTH(dbUserPrefix)) = LOWER(dbUserPrefix) THEN
 	stmtDropDatabase := 'DROP DATABASE ' || V_USERNAME;
     PERFORM dblink_exec('dbname=' || current_database()  -- current db
                         , stmtDropDatabase);

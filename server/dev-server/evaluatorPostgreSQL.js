@@ -8,7 +8,7 @@ const { Pool, Client } = require('pg')
 const LANGUAGE = 'SQL'
 const DML = 'SQL-DML'
 const DDL = 'SQL-DDL'
-var nameAndPassword = ''
+
 var globalProgrammingExercise = {}
 
 async function evalSQLPostgreSQL(programmingExercise, evalReq) {
@@ -148,18 +148,19 @@ const getQueryResult = (queries = null) => {
                 }
                 connection.query(queries)
                 .then((resultQuery) => {
-                    endTransaction(connection)
-                    .then(() => {
-                        resolve(resultQuery)
-                    })
-                    .catch(error => { // error in rollback
-                        console.log(error)
-                        reject(error)
-                    })
+                    if(Array.isArray(resultQuery)) resultQuery = resultQuery.pop()
+                    resolve(resultQuery)
                 })
                 .catch(error => { // wrong sql solution or test statements
                     console.log(error)
                     reject(error)
+                })
+                .finally(() => {
+                    endTransaction(connection)
+                    .catch(error => { // error in rollback
+                        console.log(error)
+                        reject(error)
+                    })
                 })
             })
             .catch(error => { // wrong onFly schema
@@ -172,7 +173,7 @@ const getQueryResult = (queries = null) => {
 const createOnflySchema = (connection) => {
     return new Promise((resolve, reject) => {
         //    let dbms = getQuestionDbms()
-        nameAndPassword = process.env.SQL_EVALUATOR_USERPREFIX + getNameAndPasswordSuffix()
+        var nameAndPassword = process.env.SQL_EVALUATOR_USERPREFIX + getNameAndPasswordSuffix()
 
         const createUserSentence =
             "CALL " + process.env.CREATEISOLATEUSERPROCEDURE + "('"
@@ -205,12 +206,12 @@ const createOnflySchema = (connection) => {
     })
 }
 
-const dropOnflySchema = (connection) => {
+const dropOnflySchema = (connection, userConnection) => {
     return new Promise((resolve, reject) => {
         // let dbms = getQuestionDbms()
         let dropUserSentence =
             "CALL " + process.env.DROPISOLATEUSERPROCEDURE + "('"
-            + nameAndPassword
+            + userConnection
             + "')"
         connection
             .query(dropUserSentence)
@@ -251,13 +252,14 @@ const initTransaction = () => {
 
 const endTransaction = (connection) => {
     return new Promise((resolve, reject) => {
+        var userConnection = connection.user
         connection.query('ROLLBACK', error => {
             // Close statement & connection to drop user
             connection.end()
             if (error) reject(error)
             getConnection()
                 .then(connection => {
-                    dropOnflySchema(connection)
+                    dropOnflySchema(connection, userConnection)
                         .then(res => {
                             connection.end
                             resolve()
