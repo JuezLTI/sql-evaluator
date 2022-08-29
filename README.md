@@ -1,6 +1,6 @@
-# java-evaluator
+# sql-evaluator
 
-## Java Evaluation service
+## PostgreSQL Evaluation service
 This repository is one among others two, that represents components that will be part of JuezLTI's developed by INESC-TEC
 ![Alt text](./docs/JuezLTIs.png/ 'JuezLTIs format')
 
