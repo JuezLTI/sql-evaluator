@@ -3,6 +3,7 @@ import "babel-polyfill"
 import { env } from "process"
 import { resolve } from "path"
 import convertOutput from "./convertOutput";
+import { count } from "console";
 const { Pool, Client } = require('pg')
 
 const LANGUAGE = 'SQL'
@@ -143,30 +144,64 @@ const getQueryResult = (queries = null) => {
         initTransaction()
             .then((connection) => {
                 let questionType = getQuestionType()
-                if (questionType.includes(DML) || questionType.includes(DDL)) {
-                    queries += ';\n' + getQuestionProbe()
-                }
                 connection.query(queries)
-                .then((resultQuery) => {
-                    if(Array.isArray(resultQuery)) resultQuery = resultQuery.pop()
-                    resolve(resultQuery)
+                .then(async (resultQuerySolution) => {
+                    executeInputTest(connection)
+                    .then((resultQueryInput) => {
+                         // (questionType.includes(DML) || questionType.includes(DDL))
+                        let resultQuery = resultQueryInput.constructor.name == 'Result' // When exists at least one SELECT into test IN.
+                            ? resultQueryInput
+                            : resultQuerySolution
+                        endTransaction(connection)
+                        .catch(error => { // error in rollback
+                            console.log(error)
+                            reject(error)
+                        })
+                        resolve(resultQuery)
+                    })
                 })
                 .catch(error => { // wrong sql solution or test statements
                     console.log(error)
-                    reject(error)
-                })
-                .finally(() => {
                     endTransaction(connection)
+                    .then(() => {
+                        reject(error)
+                    })
                     .catch(error => { // error in rollback
                         console.log(error)
                         reject(error)
                     })
+                })
+                .finally(() => {
                 })
             })
             .catch(error => { // wrong onFly schema
                 console.log(error)
                 reject(error)
             })
+    })
+}
+
+const executeInputTest = (connection) => {
+    return new Promise((resolve, reject) => {
+        let executedQueries = []
+        let resultQuery = {}
+        getQuestionProbe().trim().split(';').forEach(inputQuery => {
+            executedQueries.push(connection.query(inputQuery))
+        });
+        Promise.allSettled(executedQueries)
+        .then((resultQueries) => {
+            if(Array.isArray(resultQueries)) {
+                let selectFound = false
+                let index = resultQueries.length
+                while(!selectFound && --index >= 0) {
+                    if(resultQueries[index].value.command?.toUpperCase() == 'SELECT') {
+                        selectFound = true
+                        resultQuery = resultQueries[index].value
+                    }
+                }
+            }
+            resolve(resultQuery) // return last SELECT execution 
+        })
     })
 }
 
@@ -233,10 +268,7 @@ const initTransaction = () => {
             .then(connection => {
                 createOnflySchema(connection)
                     .then(connection => {
-                        connection.query('BEGIN', error => {
-                            if (error) reject(error)
-                            resolve(connection)
-                        })
+                        resolve(connection)
                     })
                     .catch(error => {
                         console.log(error)
@@ -253,25 +285,22 @@ const initTransaction = () => {
 const endTransaction = (connection) => {
     return new Promise((resolve, reject) => {
         var userConnection = connection.user
-        connection.query('ROLLBACK', error => {
-            // Close statement & connection to drop user
-            connection.end()
-            if (error) reject(error)
-            getConnection()
-                .then(connection => {
-                    dropOnflySchema(connection, userConnection)
-                        .then(res => {
-                            connection.end
-                            resolve()
-                        })
-                        .catch(error => {
-                            reject(error)
-                        })
-                })
-                .catch(error => {
-                    reject(error)
-                })
-        })
+        // Close statement & connection to drop user
+        connection.end()
+        getConnection()
+            .then(connection => {
+                dropOnflySchema(connection, userConnection)
+                    .then(res => {
+                        connection.end
+                        resolve()
+                    })
+                    .catch(error => {
+                        reject(error)
+                    })
+            })
+            .catch(error => {
+                reject(error)
+            })
     })
 }
 
