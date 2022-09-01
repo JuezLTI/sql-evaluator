@@ -18,7 +18,7 @@
         "evaluation-report-juezlti": "^1.0.6-d",
         "express": "^4.17.1",
         "mocha": "^9.1.1",
-        "programming-exercise-juezlti": "^1.0.5-a",
+        "programming-exercise-juezlti": "^1.0.6",
         "randomstring": "^1.2.1",
         "request": "^2.88.2",
         "util": "^0.12.4",
