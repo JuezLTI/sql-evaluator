@@ -1,14 +1,10 @@
 import { loadSchemaPEARL, EvaluationReport } from "evaluation-report-juezlti"
 import "babel-polyfill"
-import { env } from "process"
-import { resolve } from "path"
 import convertOutput from "./convertOutput";
-import { count } from "console";
+
 const { Pool, Client } = require('pg')
 
 const LANGUAGE = 'SQL'
-const DML = 'SQL-DML'
-const DDL = 'SQL-DDL'
 
 var globalProgrammingExercise = {}
 
@@ -80,7 +76,7 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
                                 "feedback" : 'Try it again'
                             }
                         }
-                        tests.push(addTest(input, expectedRows, studentRows))
+                        tests.push(addTest(input, expectedRows, studentRows, metadata))
                     }
                 }
 
@@ -304,7 +300,7 @@ const endTransaction = (connection) => {
     })
 }
 
-const addTest = (input, expectedOutput, obtainedOutput) => {
+const addTest = (input, expectedOutput, obtainedOutput, metadata) => {
     expectedOutput = expectedOutput ? expectedOutput : ''
     // expectedOutput = convertOutput.table2json(expectedOutput)
     obtainedOutput = obtainedOutput ? obtainedOutput : ''
@@ -315,6 +311,7 @@ const addTest = (input, expectedOutput, obtainedOutput) => {
         'outputDifferences': getOutputDifferences(expectedOutput, obtainedOutput),
         'classify': getClassify(expectedOutput, obtainedOutput),
         'mark': getGrade(expectedOutput, obtainedOutput),
+        'visible': metadata.visible,
         'feedback': getFeedback(expectedOutput, obtainedOutput),
         'environmentValues': []
     }
