@@ -5,6 +5,8 @@ import convertOutput from "./convertOutput";
 const { Pool, Client } = require('pg')
 
 const LANGUAGE = 'SQL'
+const STATEMENT_TIMEOUT = 2000
+const MAX_RESULT_ROWS = 1000
 
 var globalProgrammingExercise = {}
 
@@ -118,6 +120,10 @@ const getConnection = (dbUser = null, dbPassword = null, dbName = null) => {
             database: dbName.toLowerCase(),
             password: dbPassword,
             port: process.env.SQL_EVALUATOR_PORT,
+            // max: 20,
+            // idleTimeoutMillis: 1000,
+            // connectionTimeoutMillis: 15000,
+            statement_timeout: STATEMENT_TIMEOUT
         }
 
         const pool = new Pool(connectionParameters)
@@ -142,6 +148,9 @@ const getQueryResult = (queries = null) => {
                 let questionType = getQuestionType()
                 connection.query(queries)
                 .then(async (resultQuerySolution) => {
+                    if(resultQuerySolution?.rowCount > MAX_RESULT_ROWS) {
+                        reject(new Error('Too long result'))
+                    }
                     executeInputTest(connection)
                     .then((resultQueryInput) => {
                          // (questionType.includes(DML) || questionType.includes(DDL))
