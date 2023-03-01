@@ -190,7 +190,7 @@ const executeInputTest = (connection) => {
                 let selectFound = false
                 let index = resultQueries.length
                 while(!selectFound && --index >= 0) {
-                    if(resultQueries[index].value.command?.toUpperCase() == 'SELECT') {
+                    if(resultQueries[index]?.value?.command?.toUpperCase() == 'SELECT') {
                         selectFound = true
                         resultQuery = resultQueries[index].value
                     }
