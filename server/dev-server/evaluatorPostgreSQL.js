@@ -321,6 +321,7 @@ const addTest = (input, expectedOutput, obtainedOutput, metadata) => {
         'classify': getClassify(expectedOutput, obtainedOutput),
         'mark': getGrade(expectedOutput, obtainedOutput),
         'visible': metadata.visible,
+        'hint': metadata.feedback,
         'feedback': getFeedback(expectedOutput, obtainedOutput),
         'environmentValues': []
     }
