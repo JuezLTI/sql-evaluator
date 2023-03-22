@@ -57,10 +57,10 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
                     // let expectedOutput = programmingExercise.tests_contents_out[metadata.id]
 
                     let expectedOutput = await getQueryResult(
-                        solution
+                        solution, input
                     )
                     let resultStudent = await getQueryResult(
-                        program
+                        program, input
                     )
                     .catch(error => {
                         summary = {
@@ -141,7 +141,7 @@ const getConnection = (dbUser = null, dbPassword = null, dbName = null) => {
 
 // TODO code preGrade with MUST and MUSN'T
 
-const getQueryResult = (queries = null) => {
+const getQueryResult = (queries = null, inputTest) => {
     return new Promise((resolve, reject) => {
         initTransaction()
             .then((connection) => {
@@ -151,7 +151,7 @@ const getQueryResult = (queries = null) => {
                     if(resultQuerySolution?.rowCount > MAX_RESULT_ROWS) {
                         reject(new Error('Too long result'))
                     }
-                    executeInputTest(connection)
+                    executeInputTest(connection, inputTest)
                     .then((resultQueryInput) => {
                          // (questionType.includes(DML) || questionType.includes(DDL))
                         let resultQuery = resultQueryInput.constructor.name == 'Result' // When exists at least one SELECT into test IN.
@@ -186,11 +186,11 @@ const getQueryResult = (queries = null) => {
     })
 }
 
-const executeInputTest = (connection) => {
+const executeInputTest = (connection, inputTest) => {
     return new Promise((resolve, reject) => {
         let executedQueries = []
         let resultQuery = {}
-        getQuestionProbe().trim().split(';').forEach(inputQuery => {
+        inputTest.trim().split(';').forEach(inputQuery => {
             executedQueries.push(connection.query(inputQuery))
         });
         Promise.allSettled(executedQueries)
@@ -365,12 +365,6 @@ const getQuestionType = () => {
     })
     return questionTypes;
 
-}
-
-const getQuestionProbe = () => {
-    let metadata = globalProgrammingExercise.tests
-    let queriesProbe = globalProgrammingExercise.tests_contents_in[metadata[0].id]
-    return queriesProbe
 }
 
 module.exports = {
