@@ -19,6 +19,7 @@ const json2table = outputJson => {
         table += json2html.render(outputJson, template);
     }
     table += '</table>'
+    table = table.replace(/<\/tr>/g, '</tr>\n')
     return table
 }
 
