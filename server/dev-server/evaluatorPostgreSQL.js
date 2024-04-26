@@ -1,6 +1,7 @@
 import { loadSchemaPEARL, EvaluationReport } from "evaluation-report-juezlti"
 import "babel-polyfill"
-import convertOutput from "./convertOutput";
+// import convertOutput from "./convertOutput";
+const jsonToMarkdown2 = require('json-to-markdown-table2');
 
 const { Pool, Client } = require('pg')
 
@@ -315,8 +316,8 @@ const addTest = (input, expectedOutput, obtainedOutput, metadata) => {
     obtainedOutput = obtainedOutput ? obtainedOutput : ''
     return {
         'input': input,
-        'expectedOutput': convertOutput.json2table(expectedOutput),
-        'obtainedOutput': convertOutput.json2table(obtainedOutput),
+        'expectedOutput': jsonToMarkdown2(expectedOutput),
+        'obtainedOutput': jsonToMarkdown2(obtainedOutput),
         'outputDifferences': getOutputDifferences(expectedOutput, obtainedOutput),
         'classify': getClassify(expectedOutput, obtainedOutput),
         'mark': getGrade(expectedOutput, obtainedOutput),
