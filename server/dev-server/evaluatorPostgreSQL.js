@@ -145,8 +145,7 @@ const getConnection = (dbUser = null, dbPassword = null, dbName = null) => {
 const getQueryResult = (queries = null, inputTest) => {
     return new Promise((resolve, reject) => {
         initTransaction()
-            .then((connection) => {
-                let questionType = getQuestionType()
+            .then(connection => {
                 connection.query(queries)
                 .then(async (resultQuerySolution) => {
                     if(resultQuerySolution?.rowCount > MAX_RESULT_ROWS) {
@@ -154,34 +153,31 @@ const getQueryResult = (queries = null, inputTest) => {
                     }
                     executeInputTest(connection, inputTest)
                     .then((resultQueryInput) => {
-                         // (questionType.includes(DML) || questionType.includes(DDL))
                         let resultQuery = resultQueryInput.constructor.name == 'Result' // When exists at least one SELECT into test IN.
                             ? resultQueryInput
                             : resultQuerySolution
-                        endTransaction(connection)
-                        .catch(error => { // error in rollback
-                            console.log(error)
-                            reject(error)
-                        })
                         resolve(resultQuery)
                     })
                 })
-                .catch(error => { // wrong sql solution or test statements
-                    console.log(error)
-                    endTransaction(connection)
-                    .then(() => {
-                        reject(error)
-                    })
-                    .catch(error => { // error in rollback
-                        console.log(error)
-                        reject(error)
-                    })
+                .catch(error => {
+                    console.log('wrong sql solution or test statements: ', error)
+                    reject(error)
                 })
                 .finally(() => {
+                    if(
+                        typeof connection != 'undefined'
+                        && connection != null
+                        && connection.user != process.env.SQL_EVALUATOR_USER
+                        ) {
+                        endTransaction(connection)
+                        .catch(error => {
+                            console.log('error in rollback: ', error)
+                        })
+                    }
                 })
             })
-            .catch(error => { // wrong onFly schema
-                console.log(error)
+            .catch(error => { 
+                console.log('error on initTransacction: ', error)
                 reject(error)
             })
     })
@@ -238,6 +234,12 @@ const createOnflySchema = (connection) => {
                                 resolve(connection)
                             })
                             .catch(error => {
+                                console.log('Error in onFlyPromises: ', error)
+                                endTransaction(connection)
+                                .catch(error => {
+                                    console.log('error in rollback: ', error)
+                                })
+                                error.message = 'Error running initial script: ' + error.message
                                 reject(error)
                             })
                     })
@@ -277,12 +279,12 @@ const initTransaction = () => {
                         resolve(connection)
                     })
                     .catch(error => {
-                        console.log(error)
+                        console.log('Error in createOnFlySchema: ', error)
                         reject(error)
                     })
             })
             .catch(error => {
-                console.log(error)
+                console.log('Error in getConnection of initTransaction: ', error)
                 reject(error)
             })
     })
@@ -290,7 +292,7 @@ const initTransaction = () => {
 
 const endTransaction = (connection) => {
     return new Promise((resolve, reject) => {
-        var userConnection = connection.user
+        var userConnection = connection.user.toLowerCase()
         // Close statement & connection to drop user
         connection.end()
         getConnection()
