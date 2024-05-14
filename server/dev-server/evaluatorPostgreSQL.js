@@ -152,7 +152,7 @@ const getQueryResult = (queries = null, inputTest) => {
                         reject(new Error('Too long result'))
                     }
                     let resultQueryInput = await executeInputTest(connection, inputTest)
-                    let resultQuery = resultQueryInput.constructor.name == 'Result' // When exists at least one SELECT into test IN.
+                    let resultQuery = Array.isArray(resultQueryInput.rows) // When test IN returns any row.
                         ? resultQueryInput
                         : resultQuerySolution
                     resolve(resultQuery)
@@ -188,13 +188,23 @@ const executeInputTest = (connection, inputTest) => {
                 let selectFound = false
                 let index = resultQueries.length
                 while(!selectFound && --index >= 0) {
-                    if(resultQueries[index]?.value?.command?.toUpperCase() == 'SELECT') {
+                    if(resultQueries[index]?.value?.command?.toLowerCase() == 'select') {
                         selectFound = true
                         resultQuery = resultQueries[index].value
+                    } else if(resultQueries[index]?.status?.toLowerCase() == 'rejected') {
+                        selectFound = true
+                        resultQuery = {
+                            'rows': [{
+                                'message': resultQueries[index].reason?.message,
+                                'severity': resultQueries[index].reason?.severity,
+                                'detail': resultQueries[index].reason?.detail,
+                                'hint': resultQueries[index].reason?.hint
+                            }]
+                        }
                     }
                 }
             }
-            resolve(resultQuery) // return last SELECT execution 
+            resolve(resultQuery) // return last SELECT execution or Error
         })
     })
 }
