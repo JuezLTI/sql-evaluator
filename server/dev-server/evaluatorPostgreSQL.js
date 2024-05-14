@@ -156,14 +156,16 @@ const getQueryResult = (queries = null, inputTest) => {
                         ? resultQueryInput
                         : resultQuerySolution
                     resolve(resultQuery)
-                    endTransaction(connection)
-                    .catch(error => {
-                        console.log('error in rollback: ', error)
-                    })
                 }
                 catch(error) {
                     console.log('wrong sql solution or test statements: ', error)
                     reject(error)
+                }
+                finally {
+                    endTransaction(connection)
+                    .catch(error => {
+                        console.log('error in rollback: ', error)
+                    })
                 }
             })
             .catch(error => { 
