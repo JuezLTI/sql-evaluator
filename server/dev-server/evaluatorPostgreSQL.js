@@ -145,36 +145,26 @@ const getConnection = (dbUser = null, dbPassword = null, dbName = null) => {
 const getQueryResult = (queries = null, inputTest) => {
     return new Promise((resolve, reject) => {
         initTransaction()
-            .then(connection => {
-                connection.query(queries)
-                .then(async (resultQuerySolution) => {
+            .then(async connection => {
+                try {
+                    let resultQuerySolution = await connection.query(queries)
                     if(resultQuerySolution?.rowCount > MAX_RESULT_ROWS) {
                         reject(new Error('Too long result'))
                     }
-                    executeInputTest(connection, inputTest)
-                    .then((resultQueryInput) => {
-                        let resultQuery = resultQueryInput.constructor.name == 'Result' // When exists at least one SELECT into test IN.
-                            ? resultQueryInput
-                            : resultQuerySolution
-                        resolve(resultQuery)
+                    let resultQueryInput = await executeInputTest(connection, inputTest)
+                    let resultQuery = resultQueryInput.constructor.name == 'Result' // When exists at least one SELECT into test IN.
+                        ? resultQueryInput
+                        : resultQuerySolution
+                    resolve(resultQuery)
+                    endTransaction(connection)
+                    .catch(error => {
+                        console.log('error in rollback: ', error)
                     })
-                })
-                .catch(error => {
+                }
+                catch(error) {
                     console.log('wrong sql solution or test statements: ', error)
                     reject(error)
-                })
-                .finally(() => {
-                    if(
-                        typeof connection != 'undefined'
-                        && connection != null
-                        && connection.user != process.env.SQL_EVALUATOR_USER
-                        ) {
-                        endTransaction(connection)
-                        .catch(error => {
-                            console.log('error in rollback: ', error)
-                        })
-                    }
-                })
+                }
             })
             .catch(error => { 
                 console.log('error on initTransacction: ', error)
