@@ -7,7 +7,7 @@ const { Pool, Client } = require('pg')
 
 const LANGUAGE = 'SQL'
 const STATEMENT_TIMEOUT = 2000
-const MAX_RESULT_ROWS = 1000
+const MAX_RESULT_ROWS = 100
 
 var globalProgrammingExercise = {}
 
