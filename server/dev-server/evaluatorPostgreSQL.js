@@ -150,12 +150,13 @@ const getQueryResult = (queries = null, inputTest) => {
                     let resultQuerySolution = await connection.query(queries)
                     if(resultQuerySolution?.rowCount > MAX_RESULT_ROWS) {
                         reject(new Error('Too long result'))
+                    } else {
+                        let resultQueryInput = await executeInputTest(connection, inputTest)
+                        let resultQuery = Array.isArray(resultQueryInput.rows) // When test IN returns any row.
+                            ? resultQueryInput
+                            : resultQuerySolution
+                        resolve(resultQuery)
                     }
-                    let resultQueryInput = await executeInputTest(connection, inputTest)
-                    let resultQuery = Array.isArray(resultQueryInput.rows) // When test IN returns any row.
-                        ? resultQueryInput
-                        : resultQuerySolution
-                    resolve(resultQuery)
                 }
                 catch(error) {
                     console.log('wrong sql solution or test statements: ', error)
