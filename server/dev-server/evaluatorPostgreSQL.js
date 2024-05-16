@@ -8,6 +8,7 @@ const { Pool, Client } = require('pg')
 const LANGUAGE = 'SQL'
 const STATEMENT_TIMEOUT = 2000
 const MAX_RESULT_ROWS = 100
+const MAX_RESULT_FIELDS = 50
 
 var globalProgrammingExercise = {}
 
@@ -148,14 +149,17 @@ const getQueryResult = (queries = null, inputTest) => {
             .then(async connection => {
                 try {
                     let resultQuerySolution = await connection.query(queries)
-                    if(resultQuerySolution?.rowCount > MAX_RESULT_ROWS) {
-                        resultQuerySolution.rows = resultQuerySolution.rows.slice(0,MAX_RESULT_ROWS)
-                        resultQuerySolution.rowCount = MAX_RESULT_ROWS
-                    }
                     let resultQueryInput = await executeInputTest(connection, inputTest)
                     let resultQuery = Array.isArray(resultQueryInput.rows) // When test IN returns any row.
                         ? resultQueryInput
                         : resultQuerySolution
+                    if(resultQuery?.rowCount > MAX_RESULT_ROWS) {
+                        resultQuery.rows = resultQuery.rows.slice(0,MAX_RESULT_ROWS)
+                        resultQuery.rowCount = MAX_RESULT_ROWS
+                    }
+                    if(resultQuery?.fields?.length > MAX_RESULT_FIELDS) {
+                        reject(new Error('Too many fields in result. Max: ' + MAX_RESULT_FIELDS))
+                    }
                     resolve(resultQuery)
                 }
                 catch(error) {
