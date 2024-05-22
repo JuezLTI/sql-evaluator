@@ -269,6 +269,9 @@ const dropOnflySchema = (connection, userConnection) => {
                 resolve(res)
             })
             .catch(e => reject(e))
+            .finally(() => {
+                connection.end()
+            })
     })
 }
 
