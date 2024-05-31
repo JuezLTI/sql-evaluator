@@ -44,6 +44,7 @@ async function evalSQLPostgreSQL(programmingExercise, evalReq) {
             response.report.exercise = programmingExercise.id
             let tests = []
             try {
+                programmingExercise.keywords = sanitizeKeywords(programmingExercise.keywords)
                 if(!fulfilPreConditions(program, programmingExercise.keywords)) throw (
                     new Error("Your solution doesn't meet the requirements.")
                 )
@@ -116,7 +117,6 @@ const sanitizeKeywords = (keywords) => {
 
 const fulfilPreConditions = (program, keywords) => {
     let fulfilled = true
-    keywords = sanitizeKeywords(keywords)
 
     let compulsoryKeyword = keywords.find(keyword => keyword.startsWith('compulsory'));
     if (compulsoryKeyword) {
