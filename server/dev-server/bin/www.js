@@ -3,12 +3,11 @@
 /**
  * Module dependencies.
  */
-import dotenv from 'dotenv'
 import app from '../app';
 import debugLib from 'debug';
 import http from 'http';
 const debug = debugLib('evaluator:server');
-dotenv.config('../env.js');
+
 /**
  * Get port from environment and store in Express.
  */

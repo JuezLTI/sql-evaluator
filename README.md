@@ -6,8 +6,7 @@ This repository is one among others two, that represents components that will be
 
 
 ## Description
-Here is defined two classes util now, these classes are EvaluationReport and ProgrammingExercise, both classes are used two represent data that come in and out of the XML-evaluator
-![Alt text](./docs/xml-evaluation-service.png/ 'xml-evaluation-service format')
+Here is defined two classes util now, these classes are EvaluationReport and ProgrammingExercise, both classes are used two represent data that come in and out of the SQL-evaluator.
 
 
 ## Installation
